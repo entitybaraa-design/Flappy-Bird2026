@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flappy Bird</title>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+body{background:#70c5ce;overflow:hidden}
+canvas{display:block}
+
+.screen{
+  position:absolute;
+  inset:0;
+  background:rgba(0,0,0,0.6);
+  color:white;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  z-index:10;
+  text-align:center;
+}
+
+button{
+  margin-top:15px;
+  padding:10px 22px;
+  font-size:18px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+}
+
+#startBtn{background:#00ff99}
+#restartBtn{background:#ff5555}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<!-- شاشة البداية -->
+<div id="startScreen" class="screen">
+  <h1>🐦 Flappy Bird</h1>
+  <p>إضغط إبدأ ثم المس الشاشة للقفز</p>
+  <button id="startBtn">▶ إبدأ</button>
+</div>
+
+<!-- شاشة الموت -->
+<div id="gameOverScreen" class="screen" style="display:none;">
+  <h1>💀 لقد مت</h1>
+  <p id="scoreText">🌟 0</p>
+  <button id="restartBtn">🔁 إعادة</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+/* متغيرات اللعبة */
+let bird=null, pipes=[], score=0;
+let gravity=0.5, running=false;
+
+/* خلفية متحركة (سحب) */
+let clouds = [];
+for(let i=0;i<6;i++){
+  clouds.push({
+    x: Math.random()*canvas.width,
+    y: Math.random()*canvas.height/2,
+    speed: 0.3 + Math.random()*0.5
+  });
+}
+
+/* بدء اللعبة */
+function startGame(){
+  bird={x:80,y:canvas.height/2,r:15,v:0};
+  pipes=[];
+  score=0;
+  running=true;
+  pipes.push(newPipe());
+}
+
+/* أنبوب */
+function newPipe(){
+  let gap=160;
+  let top=Math.random()*(canvas.height-300)+50;
+  return {x:canvas.width,top,bottom:top+gap,passed:false};
+}
+
+/* تحديث */
+function update(){
+  if(!running || !bird) return;
+
+  // حركة الخلفية
+  clouds.forEach(c=>{
+    c.x -= c.speed;
+    if(c.x < -80){
+      c.x = canvas.width + 80;
+      c.y = Math.random()*canvas.height/2;
+    }
+  });
+
+  bird.v += gravity;
+  bird.y += bird.v;
+
+  // الأعلى: لا يموت، فقط منع الخروج
+  if(bird.y < bird.r){
+      bird.y = bird.r;
+  }
+
+  // الأسفل: الطفو بسلاسة
+  if(bird.y > canvas.height - bird.r){
+      bird.y = canvas.height - bird.r;
+      if(bird.v > 0) bird.v *= 0.5; // تخفيف السرعة بدل التثبيت المفاجئ
+  }
+
+  pipes.forEach(p=>{
+    p.x -= 3;
+
+    if(!p.passed && p.x+60 < bird.x){
+      score++;
+      p.passed = true;
+    }
+
+    if(
+      bird.x+bird.r > p.x &&
+      bird.x-bird.r < p.x+60 &&
+      (bird.y-bird.r < p.top || bird.y+bird.r > p.bottom)
+    ){
+      endGame();
+    }
+  });
+
+  if(pipes[pipes.length-1].x < canvas.width-250)
+    pipes.push(newPipe());
+
+  if(pipes[0].x < -60) pipes.shift();
+}
+
+/* رسم */
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // رسم السحب
+  ctx.fillStyle="rgba(255,255,255,0.8)";
+  clouds.forEach(c=>{
+    ctx.beginPath();
+    ctx.arc(c.x,c.y,25,0,Math.PI*2);
+    ctx.arc(c.x+25,c.y+10,30,0,Math.PI*2);
+    ctx.arc(c.x+50,c.y,25,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  if(!bird) return;
+
+  // الطائر
+  ctx.fillStyle="yellow";
+  ctx.beginPath();
+  ctx.arc(bird.x,bird.y,bird.r,0,Math.PI*2);
+  ctx.fill();
+
+  // الأنابيب
+  ctx.fillStyle="green";
+  pipes.forEach(p=>{
+    ctx.fillRect(p.x,0,60,p.top);
+    ctx.fillRect(p.x,p.bottom,60,canvas.height);
+  });
+
+  // النقاط (النجمة)
+  ctx.fillStyle="white";
+  ctx.font="28px Arial";
+  ctx.fillText("🌟 "+score,20,40);
+}
+
+/* حلقة */
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+/* قفز */
+function flap(){
+  if(!running) return;
+  bird.v = -8;
+}
+
+canvas.addEventListener("touchstart",flap);
+canvas.addEventListener("mousedown",flap);
+
+/* نهاية اللعبة */
+function endGame(){
+  if(!running) return;
+  running=false;
+
+  gameOverScreen.style.display="flex";
+  scoreText.innerText="🌟 "+score;
+}
+
+/* أزرار */
+startBtn.onclick=()=>{
+  startScreen.style.display="none";
+  startGame();
+};
+
+restartBtn.onclick=()=>{
+  gameOverScreen.style.display="none";
+  startGame();
+};
+</script>
+
+</body>
+</html>
